@@ -347,8 +347,8 @@ class LLVM_MCA_Module : public mkn::mod::Module {
     }
   }
 
-  static bool allow_failure(YAML::Node const& node) {
-    if (node["allow_failure"]) return mkn::kul::String::BOOL(node["allow_failure"].Scalar());
+  static bool allow_failure(mkn::mod::Node const& node) {
+    if (node.find("allow_failure")) return mkn::kul::String::BOOL(node["allow_failure"].str());
     if (auto const env = mkn::kul::env::GET(std::string{ALLOW_FAILURE_ENV}.c_str()); !env.empty())
       return mkn::kul::String::BOOL(env);
     return false;
@@ -357,12 +357,12 @@ class LLVM_MCA_Module : public mkn::mod::Module {
  public:
   // <buildDir>/llvm-mca/inc provides mkn/mca.hpp with MKN_MCA_BEGIN/END(name). The include is
   // added here, the header is written in compile() as "clean" runs between the two.
-  void init(mkn::mod::Context& ctx, YAML::Node const& /*node*/) KTHROW(std::exception) override {
+  void init(mkn::mod::Context& ctx, mkn::mod::Node const& /*node*/) KTHROW(std::exception) override {
     if (auto const buildDir = ctx.state().get("buildDir"))
       ctx.compilerState().add(mkn::mod::IncludeInput{inc_dir(*buildDir), false});
   }
 
-  void compile(mkn::mod::Context& ctx, YAML::Node const& /*node*/) KTHROW(std::exception) override {
+  void compile(mkn::mod::Context& ctx, mkn::mod::Node const& /*node*/) KTHROW(std::exception) override {
     auto const buildDir = ctx.state().get("buildDir");
     if (!buildDir) return;
     mkn::kul::Dir const incMkn{mkn::kul::Dir::JOIN(inc_dir(*buildDir), "mkn")};
@@ -371,22 +371,22 @@ class LLVM_MCA_Module : public mkn::mod::Module {
     if (!header) mkn::kul::io::Writer{header.full()} << HEADER;
   }
 
-  void link(mkn::mod::Context& ctx, YAML::Node const& node) KTHROW(std::exception) override {
+  void link(mkn::mod::Context& ctx, mkn::mod::Node const& node) KTHROW(std::exception) override {
     auto const state = ctx.state();
     std::string const buildDir = state.get("buildDir", ".");
 
     std::unordered_set<std::string> types;
-    if (node["types"])
-      for (auto const& s : mkn::kul::String::SPLIT(node["types"].Scalar(), ":")) types.insert(s);
+    if (node.find("types"))
+      for (auto const& s : mkn::kul::String::SPLIT(node["types"].str(), ":")) types.insert(s);
 
     std::vector<std::string> strip;
     for (auto const& s : mkn::kul::String::SPLIT(
-             node["strip"] ? node["strip"].Scalar() : std::string{DEFAULT_STRIP}, ":"))
+             node.find("strip") ? node["strip"].str() : std::string{DEFAULT_STRIP}, ":"))
       strip.emplace_back(s);
 
     std::size_t threads = 1;
-    if (node["threads"])
-      threads = mkn::kul::String::UINT16(node["threads"].Scalar());
+    if (node.find("threads"))
+      threads = mkn::kul::String::UINT16(node["threads"].str());
     else if (auto const t = state.get("threads"))
       threads = mkn::kul::String::UINT16(*t);
     if (threads == 0) threads = 1;
@@ -426,12 +426,12 @@ class LLVM_MCA_Module : public mkn::mod::Module {
     if (jobs.empty()) return;
 
     Shared shared;
-    shared.regionsOnly = node["regions"] && node["regions"].Scalar() == "only";
-    shared.mcaArgs.emplace_back(node["bin"] ? node["bin"].Scalar() : guess_mca_bin(compiler));
-    std::string const mcpu = node["mcpu"] ? node["mcpu"].Scalar() : mcpu_from(jobs.front().args);
+    shared.regionsOnly = node.find("regions") && node["regions"].str() == "only";
+    shared.mcaArgs.emplace_back(node.find("bin") ? node["bin"].str() : guess_mca_bin(compiler));
+    std::string const mcpu = node.find("mcpu") ? node["mcpu"].str() : mcpu_from(jobs.front().args);
     shared.mcaArgs.emplace_back("-mcpu=" + (mcpu.empty() ? std::string{"native"} : mcpu));
-    if (node["args"])
-      for (auto const& a : mkn::kul::cli::asArgs(node["args"].Scalar()))
+    if (node.find("args"))
+      for (auto const& a : mkn::kul::cli::asArgs(node["args"].str()))
         shared.mcaArgs.emplace_back(a);
     KOUT(NON) << "llvm-mca: " << shared.mcaArgs[0] << " " << shared.mcaArgs[1];
 
